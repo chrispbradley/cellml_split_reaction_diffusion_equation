@@ -30,25 +30,26 @@ PROGRAM CellMLSplitReactionDiffusionEquation
   INTEGER(CMISSIntg), PARAMETER :: GeneratedMeshUserNumber=4
   INTEGER(CMISSIntg), PARAMETER :: MeshUserNumber=5
   INTEGER(CMISSIntg), PARAMETER :: DecompositionUserNumber=6
-  INTEGER(CMISSIntg), PARAMETER :: GeometricFieldUserNumber=7
-  INTEGER(CMISSIntg), PARAMETER :: EquationsSetFieldUserNumber=8
-  INTEGER(CMISSIntg), PARAMETER :: DependentFieldUserNumber=9
-  INTEGER(CMISSIntg), PARAMETER :: MaterialsFieldUserNumber=10
-  INTEGER(CMISSIntg), PARAMETER :: EquationsSetUserNumber=11
-  INTEGER(CMISSIntg), PARAMETER :: ProblemUserNumber=12
-  INTEGER(CMISSIntg), PARAMETER :: SourceFieldUserNumber=13
-  INTEGER(CMISSIntg), PARAMETER :: CellMLUserNumber=14
-  INTEGER(CMISSIntg), PARAMETER :: CellMLModelsFieldUserNumber=15
-  INTEGER(CMISSIntg), PARAMETER :: CellMLStateFieldUserNumber=16
-  INTEGER(CMISSIntg), PARAMETER :: CellMLIntermediateFieldUserNumber=17
-  INTEGER(CMISSIntg), PARAMETER :: CellMLParametersFieldUserNumber=18
+  INTEGER(CMISSIntg), PARAMETER :: DecomposerUserNumber=7
+  INTEGER(CMISSIntg), PARAMETER :: GeometricFieldUserNumber=8
+  INTEGER(CMISSIntg), PARAMETER :: EquationsSetFieldUserNumber=9
+  INTEGER(CMISSIntg), PARAMETER :: DependentFieldUserNumber=10
+  INTEGER(CMISSIntg), PARAMETER :: MaterialsFieldUserNumber=11
+  INTEGER(CMISSIntg), PARAMETER :: EquationsSetUserNumber=12
+  INTEGER(CMISSIntg), PARAMETER :: ProblemUserNumber=13
+  INTEGER(CMISSIntg), PARAMETER :: SourceFieldUserNumber=14
+  INTEGER(CMISSIntg), PARAMETER :: CellMLUserNumber=15
+  INTEGER(CMISSIntg), PARAMETER :: CellMLModelsFieldUserNumber=16
+  INTEGER(CMISSIntg), PARAMETER :: CellMLStateFieldUserNumber=17
+  INTEGER(CMISSIntg), PARAMETER :: CellMLIntermediateFieldUserNumber=18
+  INTEGER(CMISSIntg), PARAMETER :: CellMLParametersFieldUserNumber=19
 
   !Program types
   
   !Program variables
 
   INTEGER(CMISSIntg) :: NUMBER_GLOBAL_X_ELEMENTS,CONDITION
-  INTEGER(CMISSIntg) :: NUMBER_OF_DOMAINS,NODE_NUMBER,NodeDomain
+  INTEGER(CMISSIntg) :: NODE_NUMBER,NodeDomain
   INTEGER(CMISSIntg),DIMENSION(2) :: BCNODES
   INTEGER(CMISSIntg) :: MPI_IERROR
   INTEGER :: node
@@ -58,25 +59,27 @@ PROGRAM CellMLSplitReactionDiffusionEquation
   !CMISS variables
 
   TYPE(cmfe_BasisType) :: Basis
+  TYPE(cmfe_BoundaryConditionsType) :: BoundaryConditions
+  TYPE(cmfe_CellMLType) :: CellML
+  TYPE(cmfe_CellMLEquationsType) :: CellMLEquations
   TYPE(cmfe_ComputationEnvironmentType) :: computationEnvironment
   TYPE(cmfe_ContextType) :: context
+  TYPE(cmfe_ControlLoopType) :: ControlLoop
   TYPE(cmfe_CoordinateSystemType) :: CoordinateSystem
   TYPE(cmfe_DecompositionType) :: Decomposition
+  TYPE(cmfe_DecomposerType) :: decomposer
   TYPE(cmfe_EquationsType) :: Equations
   TYPE(cmfe_EquationsSetType) :: EquationsSet
   TYPE(cmfe_FieldType) :: GeometricField,EquationsSetField,DependentField,MaterialsField,SourceField
+  TYPE(cmfe_FieldType) :: CellMLModelsField,CellMLStateField,CellMLIntermediateField,CellMLParametersField
   TYPE(cmfe_FieldsType) :: Fields
-  TYPE(cmfe_BoundaryConditionsType) :: BoundaryConditions
   TYPE(cmfe_GeneratedMeshType) :: GeneratedMesh  
   TYPE(cmfe_MeshType) :: Mesh
   TYPE(cmfe_ProblemType) :: Problem
-  TYPE(cmfe_ControlLoopType) :: ControlLoop
   TYPE(cmfe_RegionType) :: Region,WorldRegion
   TYPE(cmfe_SolverType) :: Solver, LinearSolver
   TYPE(cmfe_SolverEquationsType) :: SolverEquations
-  TYPE(cmfe_CellMLType) :: CellML
-  TYPE(cmfe_CellMLEquationsType) :: CellMLEquations
-  TYPE(cmfe_FieldType) :: CellMLModelsField,CellMLStateField,CellMLIntermediateField,CellMLParametersField
+  TYPE(cmfe_WorkGroupType) :: worldWorkGroup
 
   LOGICAL :: EXPORT_FIELD
 
@@ -89,7 +92,7 @@ PROGRAM CellMLSplitReactionDiffusionEquation
   !Generic CMISS variables
   
   INTEGER(CMISSIntg) :: NumberOfComputationalNodes,ComputationalNodeNumber
-  INTEGER(CMISSIntg) :: EquationsSetIndex,CellMLIndex
+  INTEGER(CMISSIntg) :: decompositionIndex,EquationsSetIndex,CellMLIndex
   INTEGER(CMISSIntg) :: Err
 
   
@@ -114,14 +117,17 @@ PROGRAM CellMLSplitReactionDiffusionEquation
   CALL cmfe_ErrorHandlingModeSet(CMFE_ERRORS_TRAP_ERROR,err)
   CALL cmfe_Region_Initialise(worldRegion,err)
   CALL cmfe_Context_WorldRegionGet(context,worldRegion,err)
+  
   !Get the computational nodes information
   CALL cmfe_ComputationEnvironment_Initialise(computationEnvironment,err)
   CALL cmfe_Context_ComputationEnvironmentGet(context,computationEnvironment,err)
-  CALL cmfe_ComputationEnvironment_NumberOfWorldNodesGet(computationEnvironment,numberOfComputationalNodes,err)
-  CALL cmfe_ComputationEnvironment_WorldNodeNumberGet(computationEnvironment,computationalNodeNumber,err)
+  
+  CALL cmfe_WorkGroup_Initialise(worldWorkGroup,err)
+  CALL cmfe_ComputationEnvironment_WorldWorkGroupGet(computationEnvironment,worldWorkGroup,err)
+  CALL cmfe_WorkGroup_NumberOfGroupNodesGet(worldWorkGroup,numberOfComputationNodes,err)
+  CALL cmfe_WorkGroup_GroupNodeNumberGet(worldWorkGroup,computationNodeNumber,err)
 
   NUMBER_GLOBAL_X_ELEMENTS=10
-  NUMBER_OF_DOMAINS=NumberOfComputationalNodes
 
   !Set all diganostic levels on for testing
 
@@ -196,6 +202,17 @@ PROGRAM CellMLSplitReactionDiffusionEquation
   !Finish the decomposition
   CALL cmfe_Decomposition_CreateFinish(Decomposition,Err)
 
+  !-----------------------------------------------------------------------------------------------------------
+  ! DECOMPOSER
+  !-----------------------------------------------------------------------------------------------------------
+
+  CALL cmfe_Decomposer_Initialise(decomposer,err)
+  CALL cmfe_Decomposer_CreateStart(decomposerUserNumber,region,worldWorkGroup,decomposer,err)
+  !Add in the decomposition
+  CALL cmfe_Decomposer_DecompositionAdd(decomposer,decomposition,decompositionIndex,err)
+  !Finish the decomposer
+  CALL cmfe_Decomposer_CreateFinish(decomposer,err)
+  
   !-----------------------------------------------------------------------------------------------------------
   ! GEOMETRIC FIELD
   !-----------------------------------------------------------------------------------------------------------
