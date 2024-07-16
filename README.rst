@@ -46,9 +46,10 @@ Building the example
 The fortran version of the example can be configured and built with CMake::
 
   git clone https://github.com/OpenCMISS-Examples/cellml_split_reaction_diffusion_equation
-  mkdir cellml_split_reaction_diffusion_equation-build
-  cd cellml_split_reaction_diffusion_equation-build
-  cmake -DOpenCMISSLibs_DIR=/path/to/opencmisslib/install ../cellml_split_reaction_diffusion_equation
+  cd cellml_split_reaction_diffusion_equation
+  mkdir build
+  cd build
+  cmake -DOpenCMISS_INSTALL_ROOT=/path/to/opencmiss/install ../.
   make
 
 This will create the example executable "cellml_split_reaction_diffusion_equation" in ./src/fortran/ directory.
