@@ -301,7 +301,7 @@ PROGRAM CellMLSplitReactionDiffusionEquation
   CALL OC_Field_ComponentValuesInitialise(dependentField,OC_FIELD_U_VARIABLE_TYPE, &
     & OC_FIELD_VALUES_SET_TYPE,1,0.0_OC_RP,err)
   nodeIdx=2
-  CALL OC_Decomposition_NodeDomainGet(decomposition,nodeIdx,1,nodeDomain,err)
+  CALL OC_Decomposition_NodeDomainGet(decomposition,1,nodeIdx,nodeDomain,err)
   IF(nodeDomain==computationalNodeNumber) THEN
     CALL OC_Field_ParameterSetUpdateNode(dependentField,OC_FIELD_U_VARIABLE_TYPE, &
      & OC_FIELD_VALUES_SET_TYPE, &
@@ -485,7 +485,7 @@ PROGRAM CellMLSplitReactionDiffusionEquation
   CALL OC_SolverEquations_BoundaryConditionsCreateStart(solverEquations,boundaryConditions,err)
   DO nodeIdx=1,2
     nodeNumber = boundaryConditionNodes(nodeIdx)
-    CALL OC_Decomposition_NodeDomainGet(decomposition,nodeNumber,1,nodeDomain,err)
+    CALL OC_Decomposition_NodeDomainGet(decomposition,1,nodeNumber,nodeDomain,err)
     IF(nodeDomain==computationalNodeNumber) THEN
       CALL OC_BoundaryConditions_SetNode(boundaryConditions,dependentField,OC_FIELD_U_VARIABLE_TYPE,1,OC_NO_GLOBAL_DERIV, &
         & nodeNumber,1,OC_BOUNDARY_CONDITION_FIXED,1.5_OC_RP,err)
